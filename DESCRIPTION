@@ -1,0 +1,16 @@
+Package: MDIproject
+Title: MDI Research project
+Version: 0.1.0
+Author: person("Che", "Ngufor", , "Ngufor.Che@mayo.edu", role = c("aut", "cre")) 
+Maintainer: Che Ngufor <Ngufor.Che@mayo.edu>
+Description: Machine learning and standard statistical models for 
+    identifying high need medicaid patients using self reported health measures.
+Depends: R (>= 3.1.2), PresenceAbsence, caret, ELR, plyr
+Imports: 
+    randomGLM,
+    doMC,
+    foreach, 
+    foreign
+License: GPL(>= 3)
+LazyData: true
+NeedsCompilation: no
