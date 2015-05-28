@@ -121,23 +121,32 @@ RunHighRiskMedicaid.Boot <- function(classifier,  nBoots = 5, XY.dat, resp.vars,
                                                                                  
 MTL.res = STL.res = NULL 
 nme = names(rhs.vars.list)
-nobs<-nrow(XY.dat)
-rownames(XY.dat) <- NULL 
-ix.boot <- 1:nobs
-seed <- as.integer(round(2^31 * runif(nBoots, 0, 1)))
+## set aside a validation set out o the lot 
+ix <- sample(nrow(XY.dat), floor(0.1*nrow(XY.dat)))
+dat.val <-  XY.dat[ix, ,drop = FALSE]
+XX.dat <- XY.dat[-ix, ,drop = FALSE]
 
-Boot.res <- foreach(kk = 1:nBoots) %dopar% {
+nobs<-nrow(XX.dat)
+rownames(XX.dat) <- NULL 
+ix.boot <- 1:nobs
+
+seed <- as.integer(round(2^31 * runif(nBoots, -1, 1)))
+#XY.dat <- XY.dat[sample(ix.boot, nobs), ]
+
+#Boot.res <- foreach(kk = 1:nBoots) %dopar% {
+Boot.res <- lapply(1:nBoots, function(kk){
 set.seed(seed[kk])
 cat("Start Bootstrap :", kk, "\n")
 
 inbag <- sample(ix.boot, nobs, replace = TRUE)
 outbag <- setdiff(ix.boot, inbag)
-dat.trn.val <- XY.dat[inbag, ,drop = FALSE]
-rownames(dat.trn.val) <- NULL
+dat.trn <- XY.dat[inbag, ,drop = FALSE]
+#rownames(dat.trn.val) <- NULL
 
-ix <- sample(nrow(dat.trn.val), floor(0.85*nrow(dat.trn.val)))
-dat.trn  <- dat.trn.val[ix, ,drop = FALSE] 
-dat.val <-  dat.trn.val[-ix, ,drop = FALSE] 
+#ix <- sample(nrow(dat.trn.val), floor(0.75*nrow(dat.trn.val)))
+#dat.trn  <- dat.trn.val[ix, ,drop = FALSE] 
+#dat.val <-  dat.trn.val[-ix, ,drop = FALSE] 
+
 dat.tst <- XY.dat[outbag, ,drop = FALSE] 
 
 lapply(1:length(rhs.vars.list), function(rhsvars) {
@@ -148,9 +157,9 @@ STL.res <- lapply(resp.vars, function(yy){
 
 STL.form <- as.formula(paste0(paste0(yy, "~"), paste0(rhs.vars.list[[nme[rhsvars]]], collapse= "+")))
 
-para$prior <- (table(dat.trn[, yy])/nrow(dat.trn))[2]
-para$form <- STL.form 
-para$opt.para <- opt.para 
+#para$prior <- (table(dat.trn[, yy])/nrow(dat.trn))[2]
+#para$form <- STL.form 
+#para$opt.para <- opt.para 
 
 ### classification 
 Y.trn <- dat.trn[, lhs.form(STL.form), drop = FALSE]
@@ -159,14 +168,17 @@ Y.val <- dat.val[, lhs.form(STL.form), drop = FALSE]
 X.val <-  dat.val[, rhs.form(STL.form),drop=FALSE]
 Y.tst <- dat.tst[, lhs.form(STL.form), drop = FALSE]
 X.tst <-  dat.tst[, rhs.form(STL.form),drop=FALSE]
+
 para <- lapply(STL.para, function(x) {
 if(x$Model == nme[rhsvars] & x$Outcome == yy) 
 return(x)
 }
 )
+
 para[sapply(para, is.null)] <- NULL 
 cls <- sapply(para, function(x) x$Classifier) 
 names(para) <- cls
+
 STL.res <- lapply(classifier, function(x) Train.Validate.Test.Boot(classifier=x, X.trn=X.trn, Y.trn=Y.trn,
               X.val=X.val,Y.val=Y.val,X.tst=X.tst,Y.tst=Y.tst,STL.para= para[[x]],opt.para=opt.para))      
 collect.garbage()              
@@ -186,6 +198,7 @@ dd.trn <- lapply(d.dat, function(y) y$dat.trn)
 dd.val <- lapply(d.dat, function(y) y$dat.val)
 dd.tst <- lapply(d.dat, function(y) y$dat.tst)
 names(dd.trn) = names(dd.val) = names(dd.tst) = resp.vars
+
 #para$MTL$prior <- lapply(resp.vars, function(x) (table(dd.trn[[x]][, x])/nrow(dd.trn[[x]]))[2])
 #names(para$MTL$prior) <- resp.vars
 ###############################################################################
@@ -214,15 +227,110 @@ return(list(STL.res = STL.res, MTL.res = MTL.res, do.STL=do.STL, do.MTL=do.MTL))
 }
 )
 }
+)  ### remove this for foreach 
 for(kk in 1:nBoots)
   names(Boot.res[[kk]]) <- names(rhs.vars.list)
   
 return(Boot.res)
 }
 
+#' @rdname RunModels   
+#' @export
+#'
+RunHighRiskMedicaid.BootV2 <- function(classifier,  nBoots = 5, XY.dat, resp.vars, rhs.vars.list, 
+                                           MTL.para = NULL, STL.para = NULL,  do.STL = TRUE, do.MTL = FALSE, 
+                                           task.type, opt.para=FALSE, MTL.opt.para=FALSE){                                                                                 
+MTL.res = STL.res = NULL 
+nme = names(rhs.vars.list)
+nobs<-nrow(XY.dat)
+rownames(XY.dat) <- NULL 
+ix.boot <- 1:nobs
+seed <- as.integer(round(2^31 * runif(nBoots, -1, 1)))
 
+Boot.res <- lapply(1:nBoots, function(kk){ 
+cat("Start Boot # ", kk, "\n") 
+set.seed(seed[kk])
+inbag <- sample(ix.boot, nobs, replace = TRUE)
+outbag <- setdiff(ix.boot, inbag)
+dat.trn.val <- XY.dat[inbag, ,drop = FALSE]
+rownames(dat.trn.val) <- NULL
 
+ix <- sample(nrow(dat.trn.val), floor(0.85*nrow(dat.trn.val)))
+dat.trn  <- dat.trn.val[ix, ,drop = FALSE] 
+dat.val <-  dat.trn.val[-ix, ,drop = FALSE] 
+dat.tst <- XY.dat[outbag, ,drop = FALSE] 
 
+foreach(rhs.vars = rhs.vars.list) %dopar% { 
+#### oversample training data for each model and outcome
+#### loop over resp.vars only for STL 
+if(do.STL){
+STL.res <- lapply(resp.vars, function(yy){
+STL.form <- as.formula(paste0(paste0(yy, "~"), paste0(rhs.vars, collapse= "+")))
+para$prior <- (table(dat.trn[, lhs.form(STL.form)])/nrow(dat.trn))[2]
+
+para$form <- STL.form 
+para$opt.para <- opt.para 
+### classification 
+Y.trn <- dat.trn[, lhs.form(STL.form), drop = FALSE]
+X.trn <-  dat.trn[, rhs.form(STL.form),drop=FALSE]
+Y.val <- dat.val[, lhs.form(STL.form), drop = FALSE]
+X.val <-  dat.val[, rhs.form(STL.form),drop=FALSE]
+Y.tst <- dat.tst[, lhs.form(STL.form), drop = FALSE]
+X.tst <-  dat.tst[, rhs.form(STL.form),drop=FALSE]
+STL.none <- lapply(classifier, function(x) Train.Validate.Test(classifier=x, X.trn=X.trn, Y.trn=Y.trn,
+              X.val=X.val,Y.val=Y.val,X.tst=X.tst,Y.tst=Y.tst,para=para,opt.para=opt.para))      
+collect.garbage()               
+names(STL.none) <- classifier
+#### train oversample models
+return(list(STL.none = STL.none))
+}
+)
+names(STL.res)<- resp.vars 
+}
+if(do.MTL) {
+d.dat <- lapply(resp.vars, function(x) 
+return(list(dat.trn = dat.trn[, c(x, rhs.vars)], 
+           dat.val = dat.val[, c(x, rhs.vars)], 
+           dat.tst = dat.tst[, c(x, rhs.vars)])) )
+dd.trn <- lapply(d.dat, function(y) y$dat.trn)
+dd.val <- lapply(d.dat, function(y) y$dat.val)
+dd.tst <- lapply(d.dat, function(y) y$dat.tst)
+names(dd.trn) = names(dd.val) = names(dd.tst) = resp.vars
+names(new.dd.trn) = resp.vars
+para$MTL$prior <- lapply(resp.vars, function(x) (table(dd.trn[[x]][, x])/nrow(dd.trn[[x]]))[2])
+names(para$MTL$prior) <- resp.vars
+###############################################################################
+#################### MTL 
+MTL.form <- lapply(resp.vars, function(x) as.formula(paste0(paste0(x, "~"), paste0(rhs.vars, collapse= "+"))) )
+names(MTL.form)  <- resp.vars
+if(MTL.opt.para){  ## tune for optimal parameters 
+dd <- lapply(resp.vars, function(yy) rbind(dd.trn[[yy]], dd.val[[yy]]))
+names(dd) <- resp.vars
+MTL.res <- approxMultiTaskELR.BigV2.tune(MTL.form, dd, resp.vars, task.type, para, seed)
+#MultiTask.res <- MTL.res$MTL.mod
+para$MTL$p <- MTL.res$para$MTL$p
+para$MTL$gamma <- MTL.res$para$MTL$gamma
+para$MTL$mu <- MTL.res$para$MTL$mu
+}
+MultiTask.res <- approxMultiTaskELR.BigV2(MTL.form, dd.trn, resp.vars, task.type, para, seed)
+MultiTask.perf <- Performance.MultiTaskELR(MultiTask.res, dd.trn, dd.val, dd.tst, resp.vars, 
+                   task.type,  prevalence = para$MTL$prior)
+val.cls <- MultiTask.perf$val$class
+tst.cls <- MultiTask.perf$tst$class
+MTL.res <- list(val=val.cls, tst=tst.cls)
+}     
+para$do.STL = do.STL
+para$do.MTL = do.MTL 
+cat("Done Model : ", nme[sapply(rhs.vars.list, function(x) sum(!(x%in%rhs.vars)) == 0 )], "\n")                    
+return(list(STL.res = STL.res, MTL.res = MTL.res, para = para))
+}
+}
+)
+
+for(kk in 1:cv)
+  names(Boot.res[[kk]]) <- names(rhs.vars.list)
+return(Boot.res)
+}
 
 
 

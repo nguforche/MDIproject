@@ -139,7 +139,7 @@ tab$Outcome <- factor(tab$Outcome, levels =unique(tab$Outcome))
 tab$Classifier <- factor(tab$Classifier, levels =unique(tab$Classifier))   
 Mean = plyr::ddply(tab, .variables = c("Model", "Outcome", "Classifier"), numcolwise(mean), na.rm = TRUE)
 SD = plyr::ddply(tab, .variables = c("Model", "Outcome", "Classifier"), numcolwise(sd), na.rm = TRUE)
-CI <- plyr::ddply(tab, .variables = c("Model", "Outcome"), numcolwise(quantile), 
+CI <- plyr::ddply(tab, .variables = c("Model", "Outcome", "Classifier"), numcolwise(quantile), 
                   probs = c(alpha/2, 1-alpha/2), na.rm = TRUE)
   
 tab.pct <- do.call(rbind.data.frame, lapply(res, function(x){
@@ -161,7 +161,7 @@ tab.pct$Classifier <- factor(tab.pct$Classifier, levels =unique(tab.pct$Classifi
   
 Mean.pct = plyr::ddply(tab.pct, .variables = c("Model", "Outcome", "Classifier"), numcolwise(mean), na.rm = TRUE)
 SD.pct = plyr::ddply(tab.pct, .variables = c("Model", "Outcome", "Classifier"), numcolwise(sd), na.rm = TRUE)
-CI.pct <- plyr::ddply(tab.pct, .variables = c("Model", "Outcome"), numcolwise(quantile), 
+CI.pct <- plyr::ddply(tab.pct, .variables = c("Model", "Outcome", "Classifier"), numcolwise(quantile), 
                   probs = c(alpha/2, 1-alpha/2), na.rm = TRUE)
 
 

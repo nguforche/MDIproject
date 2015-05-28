@@ -2,6 +2,7 @@
 % Please edit documentation in R/RunModels.R
 \name{RunModels}
 \alias{RunHighRiskMedicaid.Boot}
+\alias{RunHighRiskMedicaid.BootV2}
 \alias{RunHighRiskMedicaid.CV}
 \alias{RunModels}
 \title{RunModels}
@@ -11,6 +12,10 @@ RunHighRiskMedicaid.CV(classifier, cv = 2, XY.dat, resp.vars, rhs.vars.list,
   MTL.opt.para = FALSE, task.type = NULL, seed = 12345678)
 
 RunHighRiskMedicaid.Boot(classifier, nBoots = 5, XY.dat, resp.vars,
+  rhs.vars.list, MTL.para = NULL, STL.para = NULL, do.STL = TRUE,
+  do.MTL = FALSE, task.type, opt.para = FALSE, MTL.opt.para = FALSE)
+
+RunHighRiskMedicaid.BootV2(classifier, nBoots = 5, XY.dat, resp.vars,
   rhs.vars.list, MTL.para = NULL, STL.para = NULL, do.STL = TRUE,
   do.MTL = FALSE, task.type, opt.para = FALSE, MTL.opt.para = FALSE)
 }
