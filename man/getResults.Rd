@@ -4,12 +4,15 @@
 \alias{get.para}
 \alias{getResults}
 \alias{getResults.Boot}
+\alias{getResults.BootV1}
 \alias{getResults.CV}
 \title{getResults}
 \usage{
 getResults.CV(res)
 
 getResults.Boot(res, alpha = 0.05)
+
+getResults.BootV1(res, alpha = 0.05)
 
 get.para(res)
 }

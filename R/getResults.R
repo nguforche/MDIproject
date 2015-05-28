@@ -92,6 +92,88 @@ return(list(STL.Results = STL.Results, MTL.Results = MTL.Results))
 #'
 getResults.Boot <- function(res, alpha=0.05){
 MTL.Results = STL.Results = NULL 
+if(res[[1]][[1]]$para$do.MTL){
+tab <- do.call(rbind.data.frame,lapply(res, function(xx) {
+       nme = names(xx)      
+      do.call(rbind.data.frame, lapply(1:length(xx), function(y) 
+      cbind.data.frame(Model = nme[y], xx[[y]]$MTL.res$tst$opt.res
+      )) )} )) 
+tab$Model <- factor(tab$Model, levels =unique(tab$Model))
+tab$Outcome <- factor(tab$Outcome, levels =unique(tab$Outcome))
+
+Mean = ddply(tab, .variables = c("Model", "Outcome"), numcolwise(mean), na.rm = TRUE)
+SD = ddply(tab, .variables = c("Model", "Outcome"), numcolwise(sd), na.rm = TRUE)
+tab.pct <- do.call(rbind.data.frame,lapply(res, function(xx) {
+       nme = names(xx)      
+      do.call(rbind.data.frame, lapply(1:length(xx), function(y) 
+      cbind.data.frame(Model = nme[y], xx[[y]]$MTL.res$tst$pct.res
+      )) )} )) 
+tab.pct$AUC = tab.pct$AUC.sd <- NULL            
+tab$Model <- factor(tab$Model, levels =unique(tab$Model))
+tab$Outcome <- factor(tab$Outcome, levels =unique(tab$Outcome))
+
+tab.pct$Model <- factor(tab.pct$Model, levels =unique(tab.pct$Model))
+tab.pct$Outcome <- factor(tab.pct$Outcome, levels =unique(tab.pct$Outcome))
+Mean = ddply(tab, .variables = c("Model", "Outcome"), numcolwise(mean), na.rm = TRUE)
+SD = ddply(tab, .variables = c("Model", "Outcome"), numcolwise(sd), na.rm = TRUE)
+
+Mean.pct = ddply(tab.pct, .variables = c("Model", "Outcome"), numcolwise(mean), na.rm = TRUE)
+SD.pct = ddply(tab.pct, .variables = c("Model", "Outcome"), numcolwise(sd), na.rm = TRUE)
+MTL.Results = list(Mean = Mean, SD = SD, Mean.pct = Mean.pct, SD.pct = SD.pct)
+}
+
+if(res[[1]][[1]]$para$do.STL){
+tab.none <- do.call(rbind.data.frame, lapply(res, function(x){ ## cv 
+    nme = names(x)  ## models 
+    do.call(rbind.data.frame, lapply(1:length(x), function(y){  ## each model 
+    resp = names(x[[y]]$STL.res)   ## outcomes  
+    do.call(rbind.data.frame, lapply(1:length(x[[y]]$STL.res), function(z) {  ## each outcome 
+        cls <- names(x[[y]]$STL.res[[z]]$STL.none)  ## no sampling classifiers 
+       do.call(rbind.data.frame, lapply(1:length(x[[y]]$STL.res[[z]]$STL.none), function(zz)
+         cbind.data.frame(Model = nme[y],Outcome = resp[z], Classifier =cls[zz], 
+                            x[[y]]$STL.res[[z]]$STL.none[[zz]]$perf$tst.perf))) }))}))}))  
+                            
+                                                                                                                        
+tab.none$Model <- factor(tab.none$Model, levels =unique(tab.none$Model))
+tab.none$Outcome <- factor(tab.none$Outcome, levels =unique(tab.none$Outcome))
+tab.none$Classifier <- factor(tab.none$Classifier, levels =unique(tab.none$Classifier))   
+Mean.none = ddply(tab.none, .variables = c("Model", "Outcome", "Classifier"), numcolwise(mean), na.rm = TRUE)
+SD.none = ddply(tab.none, .variables = c("Model", "Outcome", "Classifier"), numcolwise(sd), na.rm = TRUE)
+CI.none <-   ddply(tab.none, .variables = c("Model", "Outcome", "Classifier"), numcolwise(quantile), 
+                  probs = c(alpha/2, 1-alpha/2), na.rm = TRUE)
+    
+tab.none.pct <- do.call(rbind.data.frame, lapply(res, function(x){
+    nme = names(x)
+    do.call(rbind.data.frame, lapply(1:length(x), function(y){
+    resp = names(x[[y]]$STL.res)    
+    do.call(rbind.data.frame, lapply(1:length(x[[y]]$STL.res), function(z) {
+        cls <- names(x[[y]]$STL.res[[z]]$STL.none)
+       do.call(rbind.data.frame, lapply(1:length(x[[y]]$STL.res[[z]]$STL.none), function(zz)
+         cbind.data.frame(Model = nme[y],Outcome = resp[z], Classifier =cls[zz], 
+                            x[[y]]$STL.res[[z]]$STL.none[[zz]]$perf$tst.perf.pct))) }))}))}))
+                            
+                                                                   
+Outcome = sapply(1:nrow(tab.none.pct), function(x) paste0(c(tab.none.pct$Outcome[x], ":", tab.none.pct$percentile[x]), collapse=""))
+tab.none.pct$Outcome <- Outcome 
+tab.none.pct$percentile = tab.none.pct$AUC = tab.none.pct$AUC.sd = NULL 
+tab.none.pct$Model <- factor(tab.none.pct$Model, levels =unique(tab.none.pct$Model))
+tab.none.pct$Outcome <- factor(tab.none.pct$Outcome, levels =unique(tab.none.pct$Outcome))
+tab.none.pct$Classifier <- factor(tab.none.pct$Classifier, levels =unique(tab.none.pct$Classifier)) 
+Mean.none.pct = ddply(tab.none.pct, .variables = c("Model", "Outcome", "Classifier"), numcolwise(mean), na.rm = TRUE)
+SD.none.pct = ddply(tab.none.pct, .variables = c("Model", "Outcome", "Classifier"), numcolwise(sd), na.rm = TRUE)
+CI.none.pct <- ddply(tab.none.pct, .variables = c("Model", "Outcome", "Classifier"), numcolwise(quantile), 
+                  probs = c(alpha/2, 1-alpha/2), na.rm = TRUE)
+STL.Results <- list(Mean.none = Mean.none, SD.none = SD.none, Mean.none.pct = Mean.none.pct, 
+                     SD.none.pct = SD.none.pct, CI.none=CI.none,CI.none.pct=CI.none.pct)
+
+}
+return(list(STL.Results = STL.Results, MTL.Results = MTL.Results))
+}
+#' @rdname getResults    
+#' @export
+#'
+getResults.BootV1 <- function(res, alpha=0.05){
+MTL.Results = STL.Results = NULL 
 
 if(res[[1]][[1]]$do.MTL){
 tab <- do.call(rbind.data.frame,lapply(res, function(xx) {
