@@ -12,7 +12,7 @@ Install via devtools:
 ```sh
 > devtools::install_github("nguforche/MDIproject")
 ```
-## Parameters
+
 
 
  
