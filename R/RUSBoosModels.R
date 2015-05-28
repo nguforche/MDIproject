@@ -708,6 +708,236 @@ accuracy.votes = accuracy.stack = accuracy.weighted.probs = NULL
 }
 
 
+#' @rdname RUSBoostModels
+#' @export
+RUSBoostFDA <- function(formula, ...) UseMethod("RUSBoostFDA")
+#' @rdname RUSBoostModels
+#' @export
+RUSBoostFDA <- function (formula, data, boot = FALSE, iters = 100, coeflearn = "Breiman", 
+                          sampleFraction, para, idx)
+{
+    if (!(as.character(coeflearn) %in% c("Freund", "Breiman",
+        "Zhu"))) {
+        stop("coeflearn must be 'Freund', 'Breiman' or 'Zhu' ")
+    }
+    formula <- as.formula(formula)
+    resp <- as.character(formula[[2]])
+    data[, resp] <- factor(ifelse(data[, resp] == 1, "Yes", "No"))        
+    vardep <- data[, resp]
+    vardep <- vardep[[1]]
+    n <- nrow(data)
+    indices <- 1:n
+    n.negative <- sum(idx)
+    negatives <- data[idx, ]
+    nclasses <- nlevels(vardep)
+    class.levels <- levels(vardep)
+    
+    trees <- list()
+    mweights <- rep(0, iters)
+    w <- rep(1/n, n)
+    matrix.weights <- array(0, c(n, iters))
+    fitControl <- trainControl(method = "none", classProbs = TRUE)
+    
+    for (m in 1:iters) {
+    
+        subset.index <- c(sample(indices[idx], n.negative * sampleFraction,
+            replace = FALSE), indices[!idx])
+        tmp.sample <- data[subset.index, ]
+        tmp.weights <- abs(w[subset.index])
+        t.s.l <- length(tmp.sample[, 1])
+        
+        if (boot == TRUE) {
+            inner.tmp.weights <<- tmp.weights
+            bootstrap <- sample(1:t.s.l, replace = TRUE, prob = tmp.weights)        
+            fit <-  train(formula, data = tmp.sample[bootstrap, ],  method = "fda", 
+                          trControl = fitControl, weights = inner.tmp.weights, 
+                          tuneGrid = data.frame(nprune = para$nprune, 
+                          degree=para$degree))                                
+           flearn <- predict(fit, newdata = data, type = "raw")
+           ind <- as.numeric(vardep != flearn)
+           err <- as.numeric(w %*% ind)        
+        }
+        if (boot == FALSE) {
+            inner.tmp.weights <<- tmp.weights
+            fit <-  train(formula, data = tmp.sample, method = "fda", 
+                          trControl = fitControl, weights = inner.tmp.weights, 
+                           tuneGrid = data.frame(nprune = para$nprune, 
+                          degree=para$degree))                                                                                 
+           flearn <- predict(fit, newdata = data, type = "raw")
+           ind <- as.numeric(vardep != flearn)
+           err <- as.numeric(w %*% ind)        
+          }
+          
+        c <- log((1 - err)/err)
+        if (coeflearn == "Breiman") {
+            c <- (1/2) * c
+        }
+        if (coeflearn == "Zhu") {
+            c <- c + log(nclasses - 1)
+        }
+        matrix.weights[, m] <- w
+        update.vector <- w * exp(c * ind)
+        w[ind == 1] <- update.vector[ind == 1]
+        w <- w/sum(w)
+        maxerror <- 0.5
+        eac <- 0.001
+        if (coeflearn == "Zhu") {
+            maxerror <- 1 - 1/nclasses
+        }
+        if (err >= maxerror) {
+            weights <- rep(1/n, n)
+            maxerror <- maxerror - eac
+            c <- log((1 - maxerror)/maxerror)
+            if (coeflearn == "Breiman") {
+                c <- (1/2) * c
+            }
+            if (coeflearn == "Zhu") {
+                c <- c + log(nclasses - 1)
+            }
+        }
+        if (err == 0) {
+            c <- log((1 - eac)/eac)
+            if (coeflearn == "Breiman") {
+                c <- (1/2) * c
+            }
+            if (coeflearn == "Zhu") {
+                c <- c + log(nclasses - 1)
+            }
+        }
+        trees[[m]] <- fit
+        mweights[m] <- c
+    }
+    mweights <- mweights/sum(mweights)
+    pred <- data.frame(rep(0, n))
+    prob <- c() 
+    nvar <- length(data[1, ]) - 1
+    imp <- array(0, c(iters, nvar))
+    for (m in 1:iters) {
+        if (m == 1) {
+            pred <- predict(trees[[m]], data, type = "raw") 
+            prob <- predict(trees[[m]], data, type = "prob")[,2]
+        }
+        else {
+            pred <- data.frame(pred, predict(trees[[m]], data, type = "raw"))
+            prob <- cbind(prob, predict(trees[[m]], data, type = "prob")[,2])
+        }
+    }
+    classfinal <- array(0, c(n, nlevels(vardep)))
+    for (i in 1:nlevels(vardep)) {
+        classfinal[, i] <- matrix(as.numeric(pred == levels(vardep)[i]), 
+        nrow = n) %*% as.vector(mweights)
+    }
+    
+    w.prob <- prob%*%as.vector(mweights)
+    w.prob <- cbind(1-w.prob, w.prob)
+    votes <- classfinal/apply(classfinal, 1, sum)
+    predclass <- rep("O", n)
+    for (i in 1:n) {
+        predclass[i] <- as.character(levels(vardep)[(order(classfinal[i,
+            ], decreasing = TRUE)[1])])
+    }
+### build model on probabilities
+	rhs <- paste0("V", 1:ncol(prob)) 
+	colnames(prob) <- rhs     
+	dt <- cbind.data.frame(resp = data[, resp], prob) 
+	colnames(dt) <- c(resp, rhs)
+	 
+	stack.form <- as.formula(paste0(paste0(resp, " ~"), paste0(rhs, collapse= "+"))) 	
+        stack.fit <-  train(stack.form, data = dt, method ="fda", 
+                          trControl = fitControl,
+                           tuneGrid = data.frame(nprune = para$nprune, 
+                          degree=para$degree))   
+                                                                                  
+	stack.prob <- predict(stack.fit, newdata = dt, type = "prob")	
+        stack.thresh <- opt.thresh(stack.prob[,2], as.numeric(data[, resp])-1)       
+        stack.class <-ifelse(stack.prob[,2] >= stack.thresh, 1, 0)
+	        
+        ans <- list(formula = formula, trees = trees, stack.fit=stack.fit,
+                      weights = mweights,votes = classfinal, prob = votes, class = predclass, 
+                     class.levels = class.levels, w.prob=w.prob, stack.prob = stack.prob, 
+                     stack.thresh=stack.thresh, stack.class=stack.class, stack.form = stack.form)
+    class(ans) <- "RUSBoostFDA"
+    ans
+}
+#' @rdname RUSBoostModels
+#' @export
+predict.RUSBoostFDA <- function (object, newdata, 
+newmfinal = length(object$trees), ...) 
+{  
+error <- NULL 
+stack.error <- NULL
+tab = NULL
+stack.prob = stack.class= NULL
+accuracy.votes = accuracy.stack = accuracy.weighted.probs = NULL 
+
+    if (newmfinal > length(object$trees) | newmfinal < 1) 
+        stop("newmfinal must be 1<newmfinal<mfinal")
+    formula <- object$formula    
+    n <- nrow(newdata)  
+    class.levels <- object$class.levels 
+    nclases <- length(class.levels)
+    pesos <- rep(1/n, n)
+    newdata <- data.frame(newdata, pesos)
+    pond <- object$weights[1:newmfinal]
+    pred <- data.frame(rep(0, n))
+    prob <- c()  
+    for (m in 1:newmfinal) {
+        if (m == 1) {
+            pred <- predict(object$trees[[m]], newdata, type = "raw")
+            prob <- predict(object$trees[[m]], newdata, type = "prob")[,2]
+        }
+        else {
+            pred <- data.frame(pred, predict(object$trees[[m]],
+             newdata, type = "raw"))
+            prob <- cbind(prob, predict(object$trees[[m]], 
+            newdata, type = "prob")[,2])
+        }
+    }               
+    classfinal <- array(0, c(n, nclases))
+    for (i in 1:nclases) {
+        classfinal[, i] <- matrix(as.numeric(pred == class.levels[i]), 
+        nrow = n) %*% pond
+    }       
+    w.prob <-   prob%*%pond   
+    w.prob <- cbind(1-w.prob, w.prob)      
+    predclass <- rep("O", n)
+    for (i in 1:n) {
+        predclass[i] <- as.character(class.levels[(order(classfinal[i, ], 
+        decreasing = TRUE)[1])])
+    }    
+### predict stack model 
+	rhs <- paste0("V", 1:ncol(prob)) 
+	colnames(prob) <- rhs  	
+	stack.prob <- predict(object$stack.fit, prob, type = "prob")                      
+	stack.class <- ifelse(stack.prob[,2] >= object$stack.thresh, 1, 0)  
+		     
+   votosporc <- classfinal/apply(classfinal, 1, sum)         
+   resp <- as.character(object$formula[[2]])
+   
+   if(resp%in%colnames(newdata)) {
+    vardep <- newdata[, resp]        
+    tab <- table(predclass, vardep, dnn = c("Predicted Class", 
+    "Observed Class"))
+    error <- 1 - sum(predclass == vardep)/n
+    accuracy.weighted.probs <- Performance(w.prob[, 2], 
+    vardep, threshold=object$stack.thresh)
+    
+    stack.error <- 1 - sum(stack.class == vardep)/n
+    accuracy.votes <- Performance(votosporc[, 2], vardep)
+    accuracy.stack <- Performance(stack.prob[, 2], 
+    vardep, threshold=object$stack.thresh)
+    
+    }           
+    output <- list(formula = formula, votes = classfinal, 
+    votes.prob = votosporc, class = predclass, confusion = tab, error = error, 
+    w.prob=w.prob, stack.prob=stack.prob,stack.class=stack.class, 
+    accuracy.votes=accuracy.votes, accuracy.stack = accuracy.stack, 
+    accuracy.weighted.probs=accuracy.weighted.probs,
+        stack.error = stack.error)
+  return(output)
+}
+
+
 
 
 

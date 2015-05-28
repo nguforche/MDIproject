@@ -4,12 +4,14 @@
 \alias{RUSBoostELR}
 \alias{RUSBoostELR.default}
 \alias{RUSBoostELR.formula}
+\alias{RUSBoostFDA}
 \alias{RUSBoostGBM}
 \alias{RUSBoostGLM}
 \alias{RUSBoostGLM.default}
 \alias{RUSBoostGLM.formula}
 \alias{RUSBoostModels}
 \alias{predict.RUSBoostELR}
+\alias{predict.RUSBoostFDA}
 \alias{predict.RUSBoostGBM}
 \alias{predict.RUSBoostGLM}
 \title{RUSBoostModels}
@@ -41,6 +43,15 @@ RUSBoostGBM(formula, data, boot = FALSE, iters = 100,
   coeflearn = "Breiman", sampleFraction, para, idx)
 
 \method{predict}{RUSBoostGBM}(object, newdata,
+  newmfinal = length(object$trees), ...)
+
+RUSBoostFDA(formula, data, boot = FALSE, iters = 100,
+  coeflearn = "Breiman", sampleFraction, para, idx)
+
+RUSBoostFDA(formula, data, boot = FALSE, iters = 100,
+  coeflearn = "Breiman", sampleFraction, para, idx)
+
+\method{predict}{RUSBoostFDA}(object, newdata,
   newmfinal = length(object$trees), ...)
 }
 \arguments{

@@ -55,7 +55,7 @@ ELR = function(X, Y, X.val, X.tst, para, opt.para = FALSE, ...){
 RUSBoostELR = function(X, Y, X.val, X.tst, para, opt.para = FALSE){
 	result <- vector("list", length = 5)
 	names(result) <-c("trn", "val", "tst", "main.model", "para") 
-	class(result) <- "RUSBoost.ELR"
+	class(result) <- "RUSBoostELR"
 	result$para <- para 		
 	rhs.vars <- colnames(X)
 	resp <- colnames(Y)
@@ -131,7 +131,7 @@ GLM = function(X, Y, X.val, X.tst, para, opt.para = FALSE){
 RUSBoostGLM = function(X, Y, X.val, X.tst, para, opt.para = FALSE){
 	result <- vector("list", length = 5)
 	names(result) <-c("trn", "val", "tst", "main.model", "para") 
-	class(result) <- "RUSBoost.GLM"
+	class(result) <- "RUSBoostGLM"
 	result$para <- para 		
 	rhs.vars <- colnames(X)
 	resp <- colnames(Y)
@@ -338,7 +338,7 @@ FDA = function(X, Y, X.val, X.tst, para, opt.para = FALSE){
     colnames(dt) <- c(resp, rhs.vars)	
     if(opt.para) { 
       fitControl <- trainControl(method = para$method, number = para$number,classProbs = TRUE, 
-                                 verboseIter = FALSE, summaryFunction = twoClassSummary)
+                           	       verboseIter = FALSE, summaryFunction = twoClassSummary)
       fitControl <- trainControl(method = para$method, number =  para$number)                           	
                                  	
       result$main.model <-  train(X, dt[, resp],  method = "fda", trControl = fitControl,
@@ -480,6 +480,57 @@ SVM = function(X, Y, X.val, X.tst, para, opt.para = FALSE){
         result$val <- pp
         pp <- predict(result$main.model, newdata =X.tst, type = "prob")[,2] 
         result$tst <- pp          
+	return(result)
+}, 
+#### RUSBoost with bagFDA 
+RUSBoostFDA = function(X, Y, X.val, X.tst, para, opt.para = FALSE){
+	result <- vector("list", length = 5)
+	names(result) <-c("trn", "val", "tst", "main.model", "para") 
+	class(result) <- "RUSBoostFDA"
+	result$para <- para 		
+	rhs.vars <- colnames(X)
+	resp <- colnames(Y)
+
+	formula.string <- as.formula(paste0(paste0(resp, " ~"), paste0(rhs.vars, collapse= "+"))) 
+	     
+        dt <- cbind.data.frame(resp= Y[,1], X)
+	dt[, "resp"] <- factor(ifelse(dt[, "resp"] == 1, 1, 0))
+	colnames(dt) <- c(resp, rhs.vars)
+        iters = para$RUSBoost$iters
+        	
+	if(para$boot.opt.para) { 
+	ix <- sample(nrow(dt), floor(nrow(dt)*0.75))
+        dat.trn <- dt[ix, , drop = FALSE]
+        dat.val <- dt[-ix, , drop = FALSE]
+        idx <- dat.trn[, resp] == 0
+        xx <- para$RUSBoost$grid
+        error <- c()
+        mod <- list()
+        for(ii in 1:length(xx)){
+	mod[[ii]] <- RUSBoostFDA(formula=formula.string, data = dat.trn, boot = para$boot, 
+	             iters = iters, coeflearn = "Breiman", sampleFraction = xx[ii], 
+	             para = para$FDA.para, idx=idx)
+	error <- c(error, predict.RUSBoostFDA(mod[[ii]], newdata = dat.val)$accuracy$AUC)
+	}	
+	ix <- which.max(error)
+	para$RUSBoost$sampleFraction <- xx[ix]
+        idx <- dt[, resp] == 0        
+        result$main.model <- RUSBoostFDA(formula=formula.string, data = dt, boot = para$boot, 
+                              iters =iters, coeflearn = "Breiman", sampleFraction = xx[ix], 
+                              para = para$FDA.para, idx=idx)	
+        } else {
+         idx <- dt[, resp] == 0
+        result$main.model <- RUSBoostFDA(formula=formula.string, data = dt, boot = para$boot, 
+                              iters =iters, coeflearn = "Breiman", 
+                              sampleFraction = para$RUSBoost$sampleFraction, 
+                              para = para$FDA.para, idx=idx)
+         }	
+        pp <-  predict.RUSBoostFDA(result$main.model, newdata = X)$w.prob[,2]        
+        result$trn <- pp          
+        pp <-  predict.RUSBoostFDA(result$main.model, newdata = X.val)$w.prob[,2]        
+        result$val <- pp                                                           
+        pp <-  predict.RUSBoostFDA(result$main.model, newdata = X.tst)$w.prob[,2] 
+        result$tst <- pp    
 	return(result)
 }
 )
