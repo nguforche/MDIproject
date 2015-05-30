@@ -8,6 +8,7 @@
 \alias{TrainValTestSplit}
 \alias{Utils}
 \alias{collect.garbage}
+\alias{my.tryCatch}
 \title{Utility functions.}
 \usage{
 TrainValTestSplit(D.dat, test = TRUE)
@@ -21,6 +22,8 @@ SplitCrossVal2(D.dat, k, ix.cv, val.propo = 0.15)
 collect.garbage()
 
 CreateDummy(D.dat)
+
+my.tryCatch(code)
 }
 \arguments{
 \item{D.dat}{A matix/data frame}
@@ -34,6 +37,8 @@ CreateDummy(D.dat)
 \item{ix.cv}{cross-validation indices}
 
 \item{train.propo,val.propo}{training set proportion}
+
+\item{code}{function or expression}
 }
 \value{
 training, validation, test data sets or K-fold cross-validation data sets.

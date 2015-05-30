@@ -205,11 +205,13 @@ return(list(STL.res = STL.res, MTL.res = MTL.res, para = para))
 }
 )
 }
+
 for(kk in 1:nBoots)
-  names(Boot.res[[kk]]) <- names(rhs.vars.list)
+  names(Boot.res[[kk]]) <- nme
   
 return(Boot.res)
 }
+
 #' @rdname RunModels   
 #' @export
 #'

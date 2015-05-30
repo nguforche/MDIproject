@@ -261,7 +261,8 @@ GBM = function(X, Y, X.val, X.tst, para, opt.para = FALSE){
 	fitControl <- trainControl(method = "none", classProbs = TRUE)
 	result$main.model <-  train(X, dt[, resp],  method = "gbm", trControl = fitControl,
                                     verbose = FALSE, tuneGrid = data.frame(n.trees = para$GBM$gbm.n.trees, 
-                                    interaction.depth=para$GBM$interaction.depth, shrinkage=para$GBM$shrinkage), 
+                                    interaction.depth=para$GBM$interaction.depth, shrinkage=para$GBM$shrinkage,
+                                    n.minobsinnode = para$GBM$n.minobsinnode), 
                                     metric = "ROC")
          } 
         pp <-  predict(result$main.model, newdata = X, type = "prob")[,2] 

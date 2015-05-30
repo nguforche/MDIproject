@@ -9,6 +9,7 @@
 #' @param ix.cv cross-validation indices 
 #' @param  train.propo,val.propo training set proportion 
 #' @param test logical: should test set be created?  
+#' @param code  function or expression 
 #' @return  training, validation, test data sets or K-fold cross-validation data sets.  
 #' @author  Che Ngufor Ngufor.Che@@mayo.edu
 NULL 
@@ -100,6 +101,49 @@ res <- do.call(cbind.data.frame, lapply(nme, function(x) {
 m
 }))
 return(res)
+}
+#' @rdname  Utils
+my.tryCatch <- function(code) {
+      err <- FALSE
+    out <- tryCatch(
+        {
+            # Just to highlight: if you want to use more than one 
+            # R expression in the "try" part then you'll have to 
+            # use curly brackets.
+            # 'tryCatch()' will return the last evaluated expression 
+            # in case the "try" part was completed successfully
+            code
+            # The return value of `readLines()` is the actual value 
+            # that will be returned in case there is no condition 
+            # (e.g. warning or error). 
+            # You don't need to state the return value via `return()` as code 
+            # in the "try" part is not wrapped insided a function (unlike that
+            # for the condition handlers for warnings and error below)
+        },
+        error=function(cond) {
+            cat("Error in the Expression: ",  paste(cond$call, collapse= ", "), ": original error message = ", cond$message, "\n")
+            err <<- TRUE
+#             cond <- paste(paste(cond$call)[1], cond$message, sep = " : ")
+#            cat(cond, "\n")
+            return(NULL)
+        },
+        warning=function(cond) {
+            cat("Warning in the Expression: ",  paste(cond$call)[1], " original warning message = ", conditionMessage(cond), "\n")
+            return(NULL)
+        },
+        finally={
+        # NOTE:
+        # Here goes everything that should be executed at the end,
+        # regardless of success or error.
+        # If you want more than one expression to be executed, then you 
+        # need to wrap them in curly brackets ({...}); otherwise you could
+        # just have written 'finally=<expression>' 
+#            message(paste("Processed : ", code))
+        }
+    )    
+    if(err) stop("stopping")
+    
+    return(out)
 }
 
 
